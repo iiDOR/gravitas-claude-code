@@ -1,11 +1,17 @@
 {
   "name": "gravitas-claude-code",
-  "version": "1.0.0",
-  "description": "Install the Gravitas engineering reliability runtime into Claude Code — enforces read-before-write, evidence-backed verification, and completion gating via hooks.",
+  "version": "1.1.0",
+  "description": "Install the Gravitas engineering reliability runtime & Living Knowledge Engine into Claude Code -- enforces Invariant 0-6, read-before-write, evidence-backed verification, and persistent repository knowledge.",
   "bin": {
     "gravitas-claude-code": "./bin/install.js"
   },
-  "keywords": ["claude-code", "gravitas", "skill", "hooks", "ai-engineering"],
+  "keywords": [
+    "claude-code",
+    "gravitas",
+    "skill",
+    "hooks",
+    "ai-engineering"
+  ],
   "author": "iiDOR",
   "license": "MIT",
   "repository": {

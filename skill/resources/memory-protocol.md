@@ -1,20 +1,30 @@
-# Memory Protocol
+# Memory Protocol (Claude Code Edition)
 
 Persistent context across sessions. Don't repeat mistakes. Don't re-discover
 what you already learned.
 
 ---
 
-## Two Memory Layers
+## Memory Hierarchy in Gravitas
 
-### Layer 1 — Session Memory (in-session, ephemeral)
+Gravitas stratifies memory into distinct lifecycles:
 
-Created at task start. Lost when session ends.
+1. **Persistent Repository Knowledge Base (Layer 2)**: Maintained in `.gravitas/knowledge/` via `python scripts/knowledge.py`. Architecture, coding conventions, test matrix, and domain module cards.
+2. **Project Memory & Preferences (Layer 3)**: Cross-session developer preferences, external reference links, and user corrections.
+3. **Session Failures (Layer 4)**: Immediate, ephemeral failure logging in `SESSION_FAILURES.md` preventing exact retries.
 
-**File:** `SESSION_FAILURES.md` in the project root or working dir.
+---
+
+## Two Working Memory Layers
+
+### Layer 1: Session Failures (In-Session, Ephemeral)
+
+Created at task start. Prevents redundant failed attempts within the same task.
+
+**File:** `SESSION_FAILURES.md` in the project root or working directory.
 
 ```markdown
-## Session Failures — 2026-09-08
+## Session Failures -- 2026-09-08
 
 - **auth timeout**: Tried changing SESSION_TIMEOUT in config.ts:15. Wrong file.
   Actual location is src/auth/session.ts:23. Do not retry config.ts.
@@ -24,19 +34,19 @@ Created at task start. Lost when session ends.
 ```
 
 **When to write:**
-- Every failed approach, immediately after failure
-- Every wrong file path discovered
-- Every command that doesn't work as expected
-- Every assumption that turned out false
+- Every failed approach, immediately after failure.
+- Every wrong file path discovered.
+- Every command that doesn't work as expected.
+- Every assumption that turned out false.
 
 **When to read:**
-- Before retrying any approach
-- Before touching a file that might have been searched before
-- At task start if the file exists from previous work
+- Before retrying any approach.
+- Before touching a file that might have been searched before.
+- At task start if the file exists from previous work.
 
 ---
 
-### Layer 2 — Project Memory (cross-session, persistent)
+### Layer 2: Project Memory (Cross-Session, Persistent)
 
 Stored in `GRAVITAS_MEMORY.md` at project root, or `.gravitas/memory/` directory.
 
@@ -62,7 +72,7 @@ updated: 2026-09-08
 
 ## Memory Types
 
-### `user` — Who is the user
+### `user` -- Who is the user
 
 ```markdown
 ---
@@ -80,7 +90,7 @@ Works in TypeScript with strict mode on.
 **How to apply:** Always show the verify command. Use conventional commits.
 ```
 
-### `feedback` — What the user has corrected
+### `feedback` -- What the user has corrected
 
 ```markdown
 ---
@@ -96,13 +106,13 @@ iteration, use `vitest run` directly. Only use `npm test` for CI checks.
 **How to apply:** Any time I'd run tests, use `vitest run` not `npm test`.
 ```
 
-### `project` — Ongoing context not in code
+### `project` -- Ongoing context not in code
 
 ```markdown
 ---
 type: project
 name: auth-rewrite-context
-description: Auth module is being rewritten — old and new systems co-exist
+description: Auth module is being rewritten -- old and new systems co-exist
 ---
 
 The auth module is mid-migration. `/src/auth/` is the new system.
@@ -110,11 +120,11 @@ The auth module is mid-migration. `/src/auth/` is the new system.
 Do not touch legacy auth unless explicitly asked. Migration completes 2026-10-01.
 
 **Why:** Prevents accidentally breaking legacy auth.
-**How to apply:** Any auth task — check which system is in scope first.
+**How to apply:** Any auth task -- check which system is in scope first.
 **Related:** [[migration-timeline]]
 ```
 
-### `reference` — External resources
+### `reference` -- External resources
 
 ```markdown
 ---
@@ -132,7 +142,7 @@ Used in src/webhooks/stripe.ts. Check here before any Stripe webhook changes.
 
 ---
 
-## Memory Index — GRAVITAS_MEMORY.md
+## Memory Index -- GRAVITAS_MEMORY.md
 
 The index file. One line per memory. Loaded into context each session.
 Never put full memory content here.
@@ -141,18 +151,18 @@ Never put full memory content here.
 # GRAVITAS Memory Index
 
 ## User
-- [user-preferences](memory/user-preferences.md) — dev preferences, commit style, verify commands
+- `memory/user-preferences.md` -- dev preferences, commit style, verify commands
 
 ## Feedback
-- [test-runner-preference](memory/test-runner-preference.md) — vitest run, not npm test
-- [import-style](memory/import-style.md) — named exports only, never default
+- `memory/test-runner-preference.md` -- vitest run, not npm test
+- `memory/import-style.md` -- named exports only, never default
 
 ## Project
-- [auth-rewrite-context](memory/auth-rewrite-context.md) — legacy and new auth co-exist
-- [db-schema](memory/db-schema.md) — schema location and migration approach
+- `memory/auth-rewrite-context.md` -- legacy and new auth co-exist
+- `memory/db-schema.md` -- schema location and migration approach
 
 ## Reference
-- [stripe-webhook-docs](memory/stripe-webhook-docs.md) — webhook signature verification
+- `memory/stripe-webhook-docs.md` -- webhook signature verification
 ```
 
 ---
@@ -160,20 +170,17 @@ Never put full memory content here.
 ## Memory Lifecycle
 
 ### Before saving
-
-1. Search for existing memory that already covers it
+1. Search for existing memory or knowledge card that already covers it
 2. Update rather than duplicate
 3. Delete memories that turned out to be wrong
 
 ### Don't save
-
 - Things in git history (git log is the memory)
 - Things derivable from code (the code is the memory)
 - Things only relevant to the current conversation
 - What the user said verbatim (extract the useful fact instead)
 
 ### When to save
-
 - Non-obvious things about the project
 - User corrections and preferences
 - Failed approaches and why they failed
@@ -184,14 +191,11 @@ Never put full memory content here.
 
 ## Recall Protocol
 
-At session start, if `GRAVITAS_MEMORY.md` exists:
-1. Read the index
-2. Load memories relevant to today's task
-3. Verify any memories that reference files (the file may have moved)
-4. Note memories that seem outdated — flag for update
-
-**Don't blindly follow stale memories.** If a memory says "function X is at
-line 23" — verify it. Lines change. Verify before recommending.
+At session start:
+1. Consult `.gravitas/knowledge/` via `python scripts/knowledge.py query` for code/architecture context.
+2. Read `GRAVITAS_MEMORY.md` if present for user preferences and corrections.
+3. Verify any memories that reference files (the file may have moved).
+4. Note memories that seem outdated -- flag for update.
 
 ---
 
@@ -200,17 +204,17 @@ line 23" — verify it. Lines change. Verify before recommending.
 When continuing a multi-session task:
 
 ```markdown
-## Task Status — [task name]
+## Task Status -- [task name]
 
 ### Completed
-- [x] Step 1: Auth recon — findings in memory/auth-rewrite-context.md
-- [x] Step 2: Plan — approved by user 2026-09-07
+- [x] Step 1: Auth recon -- findings in memory/auth-rewrite-context.md
+- [x] Step 2: Plan -- approved by user 2026-09-07
 
 ### In Progress
-- [ ] Step 3: Implementation — started src/auth/session.ts, not done
+- [ ] Step 3: Implementation -- started src/auth/session.ts, not done
 
 ### Blocked
-- Step 4: Verify — can't run tests until step 3 done
+- Step 4: Verify -- can't run tests until step 3 done
 
 ### Session Failures (this session)
 - Tried editing config.ts for timeout. Wrong file. Actual: src/auth/session.ts:23

@@ -1,53 +1,30 @@
-# Gravitas -- Model Routing Reference
-
-> WARNING: This document describes a conceptual routing policy.
-> The specific model ordering has NOT been benchmarked.
-> Do not treat these recommendations as optimal until benchmark data confirms them.
+# Gravitas -- Model Routing Reference (Claude Family)
 
 ## The Principle
 
-Spend intelligence where expected error cost exceeds expected inference cost. Route to stronger models (or deeper effort) when the cost of getting it wrong exceeds the cost of a longer, more expensive run.
+Use the least expensive model that can reliably accomplish the task under Gravitas runtime constraints.
+Escalate model tier only when complexity, uncertainty, or blast radius requires it.
 
-## Conceptual Routing Policy
+## Routing Policy for Claude Models
 
 ```
-simple fix / answer / review
-  -> fast inexpensive model + eco
+simple fix / documentation / localized edit / smoke test
+  -> Claude Haiku 4.5 / 3.5 + eco profile
 
-moderate feature / debugging
-  -> fast inexpensive model + balanced
+standard feature implementation / refactoring / bug diagnosis
+  -> Claude Sonnet 4.6 / 3.7 + balanced profile (Extended Thinking: Medium)
 
-high uncertainty / architecture / security
-  -> fast model (high effort) OR Pro-class model + deep
+architecture design / security audit / complex migration / tricky debug
+  -> Claude Opus 4.8 / Claude Sonnet 4.6 + deep profile (Extended Thinking: Maximum)
 
-parallelizable large project
-  -> parallel subagents
-
-unresolvable failure after circuit breaker
-  -> manual model escalation / user input
+circuit-breaker triggered after 2 failed attempts
+  -> Escalate thinking budget to Maximum OR escalate to Opus
 ```
 
-## When Native Features Are Better
+## Quota-Aware Graceful Degradation
 
-Do not replicate what the host already does well:
-
-| Task type | Use Gravitas | Use host native |
-|-----------|:---:|:---:|
-| Reliability enforcement | yes | -- |
-| Evidence tracking | yes | -- |
-| Requirement coverage | yes | -- |
-| Interruption recovery | yes | -- |
-| Parallel large project | -- | native parallelism |
-| Maximum reasoning depth | -- | extended thinking |
-| Single-session complex task | yes | -- |
-
-## Quota-Aware Routing
-
-Monitor quota state before starting a long session.
-
-If premium model quota is low:
-1. Switch to a fast inexpensive model + Gravitas (the intended fallback)
-2. Gravitas state.json allows continuation from any model switch point
-3. The reliability difference should be reduced by Gravitas enforcement
-
-This is Gravitas's core use case: when the premium quota is gone, the fallback with Gravitas should lose less reliability than the bare fallback model.
+If premium model quota is constrained:
+1. Switch to Claude Sonnet or Haiku combined with GRAVITAS enforcement.
+2. Gravitas `.gravitas/sessions/<task-id>/state.json` preserves state across model switches.
+3. The deterministic verification gate (`python scripts/verify.py`) prevents quality degradation
+   regardless of which model executes the prompt.

@@ -1,25 +1,29 @@
-# GRAVITAS Prompt Template
+# GRAVITAS Prompt Template (Claude Code Edition)
 
-3-layer prompt assembly for optimal Gemini performance.
-Every GRAVITAS task follows this structure.
+4-layer prompt assembly for optimal Claude Code performance and 10x token efficiency.
+Every GRAVITAS task follows this structured context hierarchy.
 
 ---
 
-## The 3-Layer System
+## The 4-Layer System
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Layer 1: System (static, load once, cacheable)          │
 │  SKILL.md + references loaded only when needed           │
-│  → Core protocol, 5 rules, tier classification           │
+│  -> Core protocol, invariants, mode constraints         │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 2: Task (per-invocation, specific)                │
-│  Goal, files, constraints, output format                 │
-│  → What to do, where, and how to report it              │
+│  Layer 2: Persistent Repository Knowledge Base (GKE)    │
+│  .gravitas/knowledge/ (architecture, conventions, cards)│
+│  -> Persistent domain grounding, 90% recon token saving │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 3: Context (delta for session/subagents)          │
-│  Memory, prior findings, session failures               │
-│  → What was learned, what failed, current state         │
+│  Layer 3: Task Contract (per-task, specific)             │
+│  Goal, scope, constraints, acceptance criteria, output   │
+│  -> What to do, where, and how to verify it             │
+├─────────────────────────────────────────────────────────┤
+│  Layer 4: Context Delta (session/subagents/resumption)   │
+│  Memory, active file slices, SESSION_FAILURES.md         │
+│  -> What was learned, what failed, current diffs        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -30,192 +34,133 @@ Every GRAVITAS task follows this structure.
 Load once. Cacheable. Contains the full GRAVITAS protocol.
 
 **Contents:**
-- 5 Non-negotiable rules
-- Tier classification (0/1/2)
-- Adaptive reasoning and budget profiles
+- Core Invariants (0-6)
+- Policy record schema
+- Extended thinking & reasoning calibration
 - Compact recovery state
 - Conditional delegation
-- Writing protocol
-- Output format
-- Verification chains
+- Output format & verification hierarchy
 
 **When to load:** At session start. Once per session.
-**When NOT to reload:** Every message (unnecessary, wastes tokens).
 
 ---
 
-## Layer 2: Task Prompt
+## Layer 2: Persistent Repository Knowledge Base
 
-Constructed fresh for each task. Maximum specificity.
+Stored in `.gravitas/knowledge/`. Managed via `python scripts/knowledge.py`.
+
+Before any multi-file search, query the knowledge base to load high-density domain context:
+```bash
+python scripts/knowledge.py query "[domain keyword]"
+```
+Or generate compact XML for prompt injection:
+```bash
+python scripts/knowledge.py query --format prompt
+```
+
+This grounds the agent in architecture, conventions, and test commands in <2,000 tokens instead of wasting 40,000+ tokens on blind grep/read cycles.
+
+---
+
+## Layer 3: Task Prompt
+
+Constructed fresh for each task. Maximum specificity using XML containers.
 
 ### Template
 
-```markdown
-## Goal
-[One sentence: exactly what to accomplish]
-
-## Files (scope)
-- Target: [exact path or "find with grep pattern"]
-- Related: [files that need reading or may be affected]
-- Tests: [test file path]
-
-## Constraints
-- [what NOT to do — specific]
-- [what to keep unchanged]
-- [scope limit: "only touch files in src/auth/"]
-
-## Context (from recon or prior work)
-- [key finding from reconnaissance]
-- [specific line numbers if known]
-- [recent git changes if relevant]
-
-## Output Format
-[exact format — with an example when non-obvious]
-
-## Tier
-[0 / 1 / 2] — [brief justification]
+```xml
+<task_contract>
+  <mode>implement</mode>
+  <objective>[One sentence: exactly what to accomplish]</objective>
+  <scope>
+    <target>[exact path or glob]</target>
+    <related>[files that need reading or may be affected]</related>
+    <tests>[test file path]</tests>
+  </scope>
+  <constraints>
+    <constraint>[what NOT to do -- specific]</constraint>
+    <constraint>[what to keep unchanged]</constraint>
+    <constraint>[scope limit: "only touch files in src/auth/"]</constraint>
+  </constraints>
+  <acceptance_criteria>
+    <criterion id="AC-1">[verifiable outcome 1]</criterion>
+    <criterion id="AC-2">[verifiable outcome 2]</criterion>
+  </acceptance_criteria>
+  <verification_depth>impact</verification_depth>
+</task_contract>
 ```
 
 ### Example: Bug Fix Task
 
-```markdown
-## Goal
-Fix SESSION_TIMEOUT: change from 5_000ms to 30_000ms.
-Users are being logged out after 5 seconds.
-
-## Files
-- Target: src/auth/session.ts (timeout constant is at line 23)
-- Test: src/auth/session.test.ts (assertion at line 47 needs update)
-- Config: tsconfig.json (strict mode — types must be correct)
-
-## Constraints
-- Only touch these 2 files
-- Don't refactor session module (out of scope)
-- Don't change other timeout values (there are 3 others — leave them)
-- Conventional commit format: "fix: increase session timeout to 30s"
-
-## Context
-- Recon found: SESSION_TIMEOUT = 5_000 at session.ts:23
-- Test at session.test.ts:47 asserts toBe(5000) — must update
-- 2 middleware files import session.ts — they'll need full suite run
-- Last change to auth.ts: 6 weeks ago (unrelated)
-
-## Output Format
-## What Changed
-[files, lines, behavior]
-
-## Evidence
-[verbatim vitest output]
-
-VERDICT: PASS
-
-## Tier
-1 — moderate, 2 files, clear scope, low risk
+```xml
+<task_contract>
+  <mode>implement</mode>
+  <objective>Fix SESSION_TIMEOUT: change from 5,000ms to 30,000ms</objective>
+  <scope>
+    <target>src/auth/session.ts</target>
+    <tests>src/auth/session.test.ts</tests>
+  </scope>
+  <constraints>
+    <constraint>Only touch src/auth/session.ts and src/auth/session.test.ts</constraint>
+    <constraint>Do not refactor the session module</constraint>
+    <constraint>Do not modify other timeout constants in the module</constraint>
+  </constraints>
+  <acceptance_criteria>
+    <criterion id="AC-1">SESSION_TIMEOUT constant set to 30000</criterion>
+    <criterion id="AC-2">session.test.ts updated to assert 30000 and passes</criterion>
+    <criterion id="AC-3">All other auth tests pass without regression</criterion>
+  </acceptance_criteria>
+  <verification_depth>impact</verification_depth>
+</task_contract>
 ```
 
 ---
 
-## Layer 3: Context Delta (for resumption and optional subagents)
+## Layer 4: Context Delta (for resumption and optional subagents)
 
 Minimal context injected at spawn time or after context compression.
 
-### For a conditional subagent
+### For a Subagent Dispatch (via Agent / Task)
 
-```markdown
-## Session Context — [agent name]
-
-### Memory
-- SESSION_TIMEOUT at src/auth/session.ts:23 (confirmed via grep)
-- Test at session.test.ts:47 (asserts old value — needs update)
-
-### Session Failures
-- Tried editing config.ts — wrong file, SESSION_TIMEOUT not there
-  → Do NOT touch config.ts
-
-### Current Task State
-- Explore: complete (findings above)
-- Plan: complete (change lines 23 and 47)
-- General: in progress (your job)
-- Verify: pending
-
-### Baseline
-47/47 tests pass before this change
+```xml
+<subagent_context role="general">
+  <knowledge_context>
+    <card id="auth" title="Authentication Subsystem">
+      Session tokens handled in src/auth/session.ts. Mutex lock required around store mutations.
+    </card>
+  </knowledge_context>
+  <memory>
+    <finding>SESSION_TIMEOUT at src/auth/session.ts:23 (confirmed via View)</finding>
+    <finding>Test at session.test.ts:47 asserts 5000</finding>
+  </memory>
+  <session_failures>
+    <failure>Tried editing config.ts -- wrong file, SESSION_TIMEOUT not there. Do NOT touch config.ts</failure>
+  </session_failures>
+  <baseline>47/47 tests pass before this change</baseline>
+  <task_state>Explore complete. Implement lines 23 and 47 now.</task_state>
+</subagent_context>
 ```
 
-### For Long Sessions (after context compression)
+### For Long Sessions (after context compaction)
 
 ```markdown
-## Session Summary — [timestamp]
+## Session Summary -- [timestamp]
 
-### What we've established
-- Bug: SESSION_TIMEOUT is 5_000 but should be 30_000
+### Knowledge Base Grounding
+- Subsystem: auth (card: .gravitas/knowledge/modules/auth.md)
+- Invariants: Mutex lock around session map
+
+### What We Have Established
+- Bug: SESSION_TIMEOUT is 5,000 but should be 30,000
 - Location: src/auth/session.ts:23
 - Test impact: session.test.ts:47 asserts old value
 - Scope confirmed: only 2 files need changing
 
-### Session failures
-- config.ts was a dead end — do not retry
+### Session Failures
+- config.ts was a dead end -- do not retry
 
 ### Status
 General agent implementing now. Verify pending.
-```
-
----
-
-## Assembling the Full Prompt
-
-### Tier 0 (trivial)
-```
-[Layer 1: SKILL.md — already loaded]
-[Layer 2: task only — 3-5 lines]
-```
-
-### Tier 1 (standard)
-```
-[Layer 1: SKILL.md]
-[Layer 2: full task template]
-[Layer 3: memory + session failures if any]
-```
-
-### Tier 2 (high-stakes)
-```
-[Layer 1: SKILL.md]
-[Layer 1+: adversarial-critique.md]
-[Layer 2: full task template with Tier 2 extensions]
-[Layer 3: full context delta]
-[User checkpoint before execution]
-```
-
----
-
-## Subagent Prompt Construction
-
-When spawning a specialized agent, give them a complete Layer 2 + Layer 3:
-
-### Explore Dispatch
-```markdown
-## Task for Explore
-**Goal:** Map [specific area] to answer: [question]
-**Scope:** [directory or file pattern]
-**Read:** [specific files if known]
-**Return:**
-  - File map: [file] → [what it contains + key lines]
-  - Dependency graph: who imports what
-  - Risk flags: ⚠️ anything unexpected
-  - Git context: last 5 changes to affected files
-Do NOT edit anything.
-```
-
-### Verify Dispatch
-```markdown
-## Task for Verify
-**Goal:** Verify the [feature/fix] is correct.
-**Scope:** [test files, source files]
-**Baseline:** [N] tests passing before change
-**Run:**
-  tsc --noEmit && eslint . && vitest run
-**Edge cases to check:** [list specific cases]
-**Return:** VERDICT: PASS or VERDICT: FAIL with full output
 ```
 
 ---
@@ -224,36 +169,40 @@ Do NOT edit anything.
 
 ### Bug Fix
 ```
-Goal: Fix [symptom] — [suspected cause]
+Goal: Fix [symptom] -- [suspected cause]
+Knowledge: python scripts/knowledge.py query "[domain]"
 Files: [target] + [test]
 Constraint: Stay in these files
-Output: What Changed + Evidence + VERDICT
-Tier: 1
+Output: What Changed + Evidence + Knowledge Sync + VERDICT
+Tier: balanced (compact)
 ```
 
 ### Feature Addition
 ```
 Goal: Add [feature] to [module]
+Knowledge: python scripts/knowledge.py query "[subsystem]"
 Files: [implementation files] + [test files]
 Constraint: [scope limits]
-Output: Full ## sections + VERDICT
-Tier: 1 or 2 depending on auth/security involvement
+Output: Full ## sections + Knowledge Sync + VERDICT
+Tier: balanced or deep depending on auth/security involvement
 ```
 
 ### Refactor
 ```
 Goal: Refactor [what] to [why]
-Files: [all affected files — be exhaustive]
+Knowledge: Check architecture.md & conventions.md
+Files: [all affected files -- be exhaustive]
 Constraint: No behavior changes, tests must pass unchanged
-Output: What Changed + Evidence (before/after pass counts) + VERDICT
-Tier: 2 if production module, 1 otherwise
+Output: What Changed + Evidence (before/after pass counts) + Knowledge Sync + VERDICT
+Tier: deep if production module, compact otherwise
 ```
 
 ### Security Fix
 ```
 Goal: Fix [vulnerability] in [location]
+Knowledge: Check conventions.md for security invariants
 Files: [target] + [tests] + [related modules]
 Constraint: Don't introduce new endpoints. Don't change auth logic except the fix.
-Output: Threat model + Fix + Security tests + VERDICT
-Tier: 2 always
+Output: Threat model + Fix + Security tests + Knowledge Sync + VERDICT
+Tier: deep always
 ```

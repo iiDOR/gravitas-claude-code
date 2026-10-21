@@ -1,18 +1,20 @@
-# Gravitas -- Adaptive Reasoning Reference
+# Gravitas -- Adaptive Reasoning Reference (Claude Code Edition)
 
 ## The Core Principle
 
-Reasoning depth must be proportional to expected error cost, not to task size or preference for showing thorough work.
+Reasoning depth must be proportional to expected error cost, reversibility, and blast radius.
 
 Do not apply:
-- Fixed token floors (always think 4K tokens for medium tasks)
-- Always-on deep reasoning for every coding task
-- Reasoning theater (visible thinking that does not change the output)
+- Fixed token floors (e.g. forcing 10k tokens on trivial 1-line changes)
+- Reasoning theater (narrating obvious facts without finding edge cases)
+- Hallucinated chain-of-thought in user-visible blocks
 
 Do apply:
-- Deeper reasoning when getting it wrong is expensive
-- Brief reasoning when the path forward is unambiguous
-- Explicit reasoning when the user needs to understand the decision
+- Deeper extended thinking when getting it wrong is destructive or hard to revert
+- Brief extended thinking when the path forward is unambiguous and contained
+- Explicit decision records when the choice affects architecture or public APIs
+
+---
 
 ## Reasoning Depth Formula
 
@@ -26,34 +28,22 @@ reasoning_depth = base
   + deficit_weight(missing_evidence_for_decision)
 ```
 
-## Reasoning by Scenario
+## Calibration by Scenario in Claude Code
 
-| Scenario | Depth | Why |
-|----------|-------|-----|
-| Typo fix in config | Minimal | Low risk, obvious path |
-| New utility function | Brief | Contained scope, reversible |
-| Multi-file feature | Moderate | Multiple failure modes |
-| Auth/security change | Deep | High irreversible risk |
-| Ambiguous requirements | Deep | Uncertainty requires exploration |
-| 2nd attempt after failure | Deep | Prior approach failed, need different angle |
-| Schema migration | Maximum | Destructive, production impact |
+| Scenario | Extended Thinking Depth | Thinking Budget | Focus |
+|---|:---:|:---:|---|
+| Typo / localized bug fix | Low | ~1k - 2k tokens | Verify line number, check immediate callers |
+| New utility function | Moderate | ~3k - 5k tokens | Edge cases (null, empty), type signatures |
+| Multi-file feature | High | ~6k - 12k tokens | Data flow, caller contracts, regression risk |
+| Auth, crypto, or security | Maximum | ~16k - 32k tokens | Threat model, bypass surface, replay attacks |
+| Schema migration | Maximum | ~16k - 32k tokens | Backward compatibility, data loss, rollback |
+| 2nd attempt after failure | High / Maximum | ~8k - 16k tokens | Root-cause post-mortem, why did attempt 1 fail |
 
-## Selective CoT
+---
 
-Practical rule:
-- Emit explicit reasoning when it changes what you do or helps the user decide
-- Do not emit reasoning as proof of thoroughness
-- A decision record (see SKILL.md) is better than narrated chain-of-thought
+## Selective Chain-of-Thought
 
-## Red Flags for Under-Reasoning
-
-- Going from task description directly to code without a plan
-- Attempting the same approach that failed in the same session
-- Missing a non-obvious dependency that a brief impact analysis would catch
-- Writing to a file before understanding its current state
-
-## Red Flags for Over-Reasoning
-
-- Extended analysis of trivial, single-line, fully reversible changes
-- Multiple alternatives for a task with one clear solution
-- Subagent spawning for a fix that stays within one file
+Practical rules:
+- Emit explicit reasoning inside `<thinking>` to deliberate on risks and invariants.
+- Emit a `<decision_record>` before mutating non-trivial code.
+- Keep final user-visible response structured and evidence-focused (`## What Changed`, `## Evidence`, `## Why`, `VERDICT`).

@@ -9,7 +9,7 @@ from pathlib import Path
 READ_TOOLS = {"Read", "Glob", "Grep"}
 WRITE_TOOLS = {"Write", "Edit", "MultiEdit"}
 
-TEST_TERMS = ["vitest", "pytest", "jest", "go test", "cargo test", "rspec", "dotnet test", "mvn test"]
+TEST_TERMS = ["vitest", "pytest", "jest", "go test", "cargo test", "rspec", "dotnet test", "mvn test", "verify.py", "knowledge.py", "ctest"]
 LINT_TERMS = ["eslint", "ruff", "clippy", "rubocop"]
 TYPE_TERMS = ["tsc --noEmit", "mypy", "cargo check"]
 
